@@ -14,7 +14,168 @@
     <link href="https://fonts.googleapis.com/css2?family=Jersey+15&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Jacquard+12+Charted&family=Jersey+15&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Jacquard+12+Charted&family=Jersey+15&display=swap" rel="stylesheet">
-    
+
+	<!--Insert this script to a GvbvdxxChat based site to simulate servers in your browser-->
+	<script>
+	  class WebSocket {
+	    static get CONNECT_SPEED_MS() {
+	      //How many miliseconds would the initial connection speed be?
+	      return 1000;
+	    }
+	    static get CHECK_RATE_MS() {
+	      //Change this to adjust the speed of how fast the fake websocket can scan for new message data.
+	      return 1000 / 60;
+	    }
+	    static get SOCKET_STORAGE_URL_PREFIX() {
+	      return "FakeSocket-"; //This makes the local storage store stuff like: FakeSocket-ws://someserver.com
+	    }
+	
+	    constructor(providedURL) {
+	      if (typeof providedURL !== "string") {
+	        throw new Error("Specified ws:// or wss:// URL must be a string");
+	        return;
+	      }
+	      var url = providedURL.trim();
+	      if (!url.startsWith("ws://") && !url.startsWith("wss://")) {
+	        throw new Error(
+	          "The websocket server url must start with ws:// or wss://"
+	        );
+	        return;
+	      }
+	      var t = this;
+	      this.events = {
+	        emit: function (name, ...values) {
+	          if (!this[name]) return;
+	          this[name].forEach((f) => {
+	            f.apply(t, values);
+	          });
+	        },
+	        open: [],
+	        close: [],
+	        message: [],
+	      };
+	      this.onmessage = function () {};
+	      this.onopen = function () {};
+	      this.onclose = function () {};
+	
+	      this.url = url;
+	      this._isOpen = false;
+	      // Tracks the timestamp of the last message this instance has processed
+	      this._curTime = 0;
+	
+	      // Simulate async connection
+	      setTimeout(() => {
+	        t.events.emit("open");
+	        if (t.onopen) {
+	          t.onopen();
+	        }
+	        t._isOpen = true;
+	      }, WebSocket.CONNECT_SPEED_MS); // Shortened delay
+	
+	      // Check for messages on a more reasonable interval than 1ms
+	      this.checkInterval = setInterval(
+	        this._checkMessage.bind(this),
+	        WebSocket.CHECK_RATE_MS
+	      );
+	
+	      console.log("Safe browser testing enviroment echo url made for: " + url);
+	    }
+	
+	    close() {
+	      clearInterval(this.checkInterval);
+	      this._isOpen = false;
+	      this.events.emit("close");
+	      if (this.onclose) {
+	        this.onclose();
+	      }
+	    }
+	
+	    /**
+	     * Checks localStorage for any new messages we haven't processed yet.
+	     */
+	    _checkMessage() {
+	      if (!this._isOpen) {
+	        return;
+	      }
+	
+	      const storageValue = localStorage.getItem(this.url);
+	      if (!storageValue) {
+	        return;
+	      }
+	
+	      let allMessages = [];
+	      try {
+	        allMessages = JSON.parse(storageValue);
+	        if (!Array.isArray(allMessages)) allMessages = [];
+	      } catch (e) {
+	        allMessages = [];
+	      }
+	
+	      // Find all messages that are newer than the last one we processed
+	      const newMessages = allMessages.filter((msg) => msg.time > this._curTime);
+	
+	      if (newMessages.length > 0) {
+	        // Process all new messages
+	        for (const msg of newMessages) {
+	          this._emitMessage(msg.data);
+	        }
+	
+	        // Update our "last processed" time to the latest message's time
+	        this._curTime = newMessages[newMessages.length - 1].time;
+	      }
+	    }
+	
+	    /**
+	     * Emits a message event to the application.
+	     */
+	    _emitMessage(msg) {
+	      const event = { data: msg.toString() };
+	      this.events.emit("message", event);
+	      if (this.onmessage) {
+	        this.onmessage(event);
+	      }
+	    }
+	
+	    /**
+	     * "Sends" a message by adding it to the queue in localStorage.
+	     */
+	    send(msg = "") {
+	      const now = Date.now();
+	      const storageValue = localStorage.getItem(this.url) || "[]";
+	
+	      let allMessages = [];
+	      try {
+	        allMessages = JSON.parse(storageValue);
+	        if (!Array.isArray(allMessages)) allMessages = [];
+	      } catch (e) {
+	        allMessages = [];
+	      }
+	
+	      // Add the new message
+	      allMessages.push({
+	        time: now,
+	        data: msg.toString(),
+	      });
+	
+	      // --- Pruning Logic ---
+	      // To prevent localStorage from growing forever, we'll prune messages
+	      // that are older than 5 seconds.
+	      const fiveSecondsAgo = now - 5000;
+	      const prunedMessages = allMessages.filter(
+	        (msg) => msg.time >= fiveSecondsAgo
+	      );
+	
+	      localStorage.setItem(this.url, JSON.stringify(prunedMessages));
+	    }
+	
+	    addEventListener(eventName, func) {
+	      if (!this.events[eventName]) {
+	        this.events[eventName] = [];
+	      }
+	      this.events[eventName].push(func);
+	    }
+	  }
+	</script>
   </head>
   <body>
     <style>
