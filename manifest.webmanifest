@@ -1,0 +1,17 @@
+{
+    "background_color": "#333333",
+    "description": "Random rants, where you post the stupidest stuff.",
+    "display": "standalone",
+    "icons": [
+		{
+            "sizes": "256x256",
+            "src": "favicon.png",
+            "type": "image/png"
+        }
+    ],
+    "name": "Random Rants",
+    "short_name": "Random Rants",
+    "start_url": "/",
+    "theme_color": "#b8b8b8",
+	  "version": 2.0
+}
